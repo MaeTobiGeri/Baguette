@@ -2,15 +2,21 @@ use std::path::Path;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
+use std::process;
 
 use pixels::{Pixels, SurfaceTexture};
+
 use winit::dpi::LogicalSize;
 use winit::event::{Event, VirtualKeyCode};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 
+use image::{ImageBuffer, Rgba};
+
 const WIDTH: u32 = 960;
 const HEIGHT: u32 = 540;
+const VIEWPORT_WIDTH: u32 = 880;
+const VIEWPORT_HEIGHT: u32 = 460;
 
 struct World {
     pixels: Vec<u8>,
@@ -28,6 +34,19 @@ impl World {
             let index = ((y * WIDTH + x) * 4) as usize;
             self.pixels[index..index + 4].copy_from_slice(&color);
         }
+    }
+    fn save_as_png(&self, filename: &str) -> Result<(), image::ImageError> {
+        let mut img = ImageBuffer::new(WIDTH, HEIGHT);
+        for (x, y, pixel) in img.enumerate_pixels_mut() {
+            let index = ((y * WIDTH + x) * 4) as usize;
+            *pixel = Rgba([
+                self.pixels[index],
+                self.pixels[index + 1],
+                self.pixels[index + 2],
+                self.pixels[index + 3],
+            ]);
+        }
+        img.save(filename)
     }
 }
 
@@ -48,32 +67,180 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut file = File::open(filepath)?;
     file.read_to_string(&mut content)?;
     let content_array: Vec<&str> = convert_string_into_array(content.as_str());
-    init_window(content_array)?;
+    
+    let mut canvas = World::new();
+    process_content(&mut canvas, &content_array);
+    let _ = canvas.save_as_png("output.png");
+    
+    init_window(canvas)?;
 
     #[allow(unreachable_code)]
     Ok(())
 }
 
 fn convert_string_into_array(file_content: &str) -> Vec<&str> {
-    let arr : Vec<&str> = file_content.split(' ').collect();
-    let mut split_arr = Vec::new();
-    for i in 0..arr.len() {
-        if (arr[i].contains('\n')) {
-            let mut split_vec = arr[i].split('\n').collect::<Vec<&str>>();
-            split_arr.push("\n");
-            split_arr.push(&mut split_vec[1]);
-        } else {
-            split_arr.push(arr[i]);
-        }
-    }
-    return split_arr;
+    file_content
+    .lines()
+    .flat_map(|line| {
+        let mut words = line.split_whitespace().collect::<Vec<&str>>();
+        words.push("\n");
+        words
+    })
+    .collect()
 }
 
-fn init_window(content_array: Vec<&str>) -> Result<(), pixels::Error>
+fn process_content(canvas: &mut World, content_array: &[&str]) {
+    let mut width = 40;
+    let mut height = 40;
+
+    for &word in content_array {
+        let mut contains = false;
+        match word {
+            "\n" => {
+                height += 1;
+                width = 40;
+                contains = true;
+            }
+            "Croissant" | "croissant" => {
+                if width < VIEWPORT_WIDTH + 40 && height < VIEWPORT_HEIGHT + 40 {
+                    canvas.draw_pixel(width, height, [0, 0, 0, 255]);
+                }
+                width += 1;
+                contains = true;
+            }
+            "Baguette" | "baguette" => {
+                if width < VIEWPORT_WIDTH + 40 && height < VIEWPORT_HEIGHT + 40 {
+                    canvas.draw_pixel(width, height, [179, 145, 103, 255]);
+                }
+                width += 1;
+                contains = true;
+            }
+            _ => width += 1,
+        }
+        if word.contains("Boulangerie(") 
+        {
+            contains = true;
+            if !word.contains(")")
+            {
+                let error = height - 39;
+                eprintln!("Syntax Error in line: {error} no Space supported inside of the loop");
+                process::exit(1);
+            }
+            let mut repeate : String = String::new();
+            let mut givencolor : String = String::new();
+            let mut iscolorgiven : i32 = 0;
+            let mut i = 0;
+            for c in word.chars() {
+                if c.is_numeric() && iscolorgiven < 2{
+                    repeate.push(c);
+                }
+                if iscolorgiven >= 1 
+                {
+                    if c.is_numeric() || c == ',' {
+                        givencolor.push(c);
+                    }
+                }
+                if c == '('{
+                    iscolorgiven += 1;
+                }
+                i += 1;
+                if i == 13 && !c.is_numeric(){
+                    let error = height - 39;
+                    eprintln!("Syntax Error in line: {error} Boulangerie(val,type) with color Boulangerie(val,type(rgbcolor))");
+                    process::exit(1);   
+                }
+                
+            }
+            println!("{}", repeate);
+            if word.contains("Croissant") || word.contains("croissant") || word.contains("Baguette") || word.contains("baguette")
+            {
+                for _i in 0..repeate.parse::<i32>().unwrap() 
+                {
+                    if width < VIEWPORT_WIDTH + 40 && height < VIEWPORT_HEIGHT + 40 {
+                        if iscolorgiven > 1 
+                        {
+                            let mut split_string = givencolor.split(',').collect::<Vec<&str>>();
+                            canvas.draw_pixel(width, height, [
+                                split_string[0].parse().unwrap_or(255),
+                                split_string[1].parse().unwrap_or(255),
+                                split_string[2].parse().unwrap_or(255),
+                                if split_string.len() > 3 {
+                                    split_string[3].parse().unwrap_or(255)
+                                } else {
+                                    255
+                                }
+                            ]);
+                        }
+                        else if word.contains("roissant")
+                        {
+                            canvas.draw_pixel(width, height, [0, 0, 0, 255]);
+                        }else{
+                            canvas.draw_pixel(width, height, [179, 145, 103, 255]);
+                        }
+                    }
+                    width += 1;
+                    if width >= VIEWPORT_WIDTH + 40 {
+                        let error = height - 39;
+                        eprintln!("Linelimit out of bounce width");
+                        process::exit(1);
+                    }
+                }
+            } 
+            else 
+            {
+                let error = height - 39;
+                eprintln!("Syntax Error in line: {error}");
+                process::exit(1);
+            }
+            width -= 1;
+        }
+        else if word.contains("(") && word.contains(")") && (word.contains("Croissant") || word.contains("croissant") || word.contains("Baguette") || word.contains("baguette"))
+        {
+            contains = true;
+            let mut repeate : String = String::new();
+            
+            for c in word.chars() {
+                if c.is_numeric() || c == ',' {
+                    repeate.push(c);
+                }
+            }
+            let mut split_string = repeate.split(',').collect::<Vec<&str>>();
+            if width < VIEWPORT_WIDTH + 40 && height < VIEWPORT_HEIGHT + 40 {
+                canvas.draw_pixel(width, height, [
+                    split_string[0].parse().unwrap_or(255),
+                    split_string[1].parse().unwrap_or(255),
+                    split_string[2].parse().unwrap_or(255),
+                    if split_string.len() > 3 {
+                        split_string[3].parse().unwrap_or(255)
+                    } else {
+                        255
+                    }
+                ]);
+            }
+        }
+        if contains == false {
+            let error = height - 39;
+            eprintln!("Syntax Error in line error 2: {error}");
+            process::exit(1);
+        }
+        if width >= VIEWPORT_WIDTH + 40 {
+            let error = height - 39;
+            eprintln!("Linelimit out of bounce width");
+            process::exit(1);
+        }
+        if height >= (VIEWPORT_HEIGHT + 40) {
+            let error = height - 39;
+            eprintln!("Linelimit out of bounce height");
+            process::exit(1);
+        }
+    }
+}
+
+fn init_window(canvas: World) -> Result<(), pixels::Error> 
 {
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new()
-        .with_title("Pixel Drawing")
+        .with_title("Baguette")
         .with_inner_size(LogicalSize::new(WIDTH as u32, HEIGHT as u32))
         .with_resizable(false)
         .build(&event_loop)
@@ -87,64 +254,29 @@ fn init_window(content_array: Vec<&str>) -> Result<(), pixels::Error>
             pixels
         };
 
-    let mut canvas = World::new();
-
-    let mut width = 40;
-    let mut height = 40;
-
-    for &word in &content_array {
-        match word {
-            "\n" => {
-                height += 1;
-                width = 40;
-            }
-            "Croissant" | "croissant" => {
-                if (width < WIDTH -40 && height < HEIGHT -40) {
-                    canvas.draw_pixel(width, height, [0, 0, 0, 255]);
-                }
-                width += 1;
-            }
-            "Baguette" | "baguette" => {
-                if (width < WIDTH - 40 && height < HEIGHT -40) {
-                    canvas.draw_pixel(width, height, [179, 145, 103, 255]);
-                }
-                width += 1;
-            }
-            _ => width += 1,
-        }
-
-        if (width >= WIDTH - 40) {
-            height += 1;
-            width = 40;
-        }
-        if (height >= HEIGHT - 40) {
-            break;
-        }
-    }
-
-    event_loop.run(move |event, _, control_flow| {
-        match event {
-            Event::RedrawRequested(_) => {
-                pixels.frame_mut().copy_from_slice(&canvas.pixels);
-                if let Err(err) = pixels.render() {
-                    eprintln!("Render error: {}", err);
-                    *control_flow = ControlFlow::Exit;
-                    return;
-                }
-            }
-            Event::WindowEvent { event, .. } => match event {
-                winit::event::WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-                winit::event::WindowEvent::KeyboardInput { input, .. } => {
-                    if let Some(VirtualKeyCode::Escape) = input.virtual_keycode {
+        event_loop.run(move |event, _, control_flow| {
+            match event {
+                Event::RedrawRequested(_) => {
+                    pixels.frame_mut().copy_from_slice(&canvas.pixels);
+                    if let Err(err) = pixels.render() {
+                        eprintln!("Render error: {}", err);
                         *control_flow = ControlFlow::Exit;
+                        return;
                     }
                 }
+                Event::WindowEvent { event, .. } => match event {
+                    winit::event::WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                    winit::event::WindowEvent::KeyboardInput { input, .. } => {
+                        if let Some(VirtualKeyCode::Escape) = input.virtual_keycode {
+                            *control_flow = ControlFlow::Exit;
+                        }
+                    }
+                    _ => (),
+                },
                 _ => (),
-            },
-            _ => (),
-        }
-    
-        window.request_redraw();
-    });
-}
+            }
+            
+            window.request_redraw();
+        });
+    }
 
