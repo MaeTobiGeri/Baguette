@@ -35,7 +35,7 @@ cargo build --release
 ## Usage
 
 To use the Baguette compiler, run:
-./Baguette <File Path>
+./Baguette File Path
 
 ## Contributing
 
