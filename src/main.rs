@@ -20,19 +20,23 @@ const VIEWPORT_HEIGHT: u32 = 460;
 
 struct World {
     pixels: Vec<u8>,
+    background_color: [u8; 4],
 }
 
 impl World {
     fn new() -> Self {
         Self {
             pixels: vec![211; (WIDTH * HEIGHT * 4) as usize],
+            background_color: [211, 211, 211, 255], // Default light gray
         }
     }
 
     fn draw_pixel(&mut self, x: u32, y: u32, color: [u8; 4]) {
         if x < WIDTH && y < HEIGHT {
             let index = ((y * WIDTH + x) * 4) as usize;
-            self.pixels[index..index + 4].copy_from_slice(&color);
+            if color != self.background_color {
+                self.pixels[index..index + 4].copy_from_slice(&color);
+            }
         }
     }
     fn save_as_png(&self, filename: &str) -> Result<(), image::ImageError> {
@@ -55,13 +59,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
     if (args.len() != 2) 
     {
-        println!("Usage: ./Baguette <File Path>");
+        eprintln!("Usage: ./Baguette <File Path>");
+        process::exit(1);
         return Ok(());
     }
     let filepath : &String = &args[1];
     if (Path::new(filepath).extension().unwrap() != "baguette" && Path::new(filepath).extension().unwrap() != "croissant") {
-        println!("invalid file extension");
-        println!("{:?}", Path::new(filepath).extension().unwrap());
+        eprintln!("Compiller error: Invalid file extension use .baguette or .croissant");
+        process::exit(1);
     }
 
     let mut file = File::open(filepath)?;
@@ -117,6 +122,31 @@ fn process_content(canvas: &mut World, content_array: &[&str]) {
             }
             _ => width += 1,
         }
+        if word.contains("Patisserie(") {
+            contains = true;
+            if !word.contains(")")
+            {
+                let error = height - 39;
+                eprintln!("Syntax Error in line: {error} no Space supported inside of the color specification of the Patisserie keyword");
+                process::exit(1);  
+            }
+            let color_str = word.trim_start_matches("Patisserie(").trim_end_matches(")");
+            let color_values: Vec<&str> = color_str.split(',').collect();
+            if color_values.len() >= 3 {
+                let r = color_values[0].trim().parse().unwrap_or(255);
+                let g = color_values[1].trim().parse().unwrap_or(255);
+                let b = color_values[2].trim().parse().unwrap_or(255);
+                let a = if color_values.len() > 3 {
+                    color_values[3].trim().parse().unwrap_or(255)
+                } else {
+                    255
+                };
+                canvas.background_color = [r, g, b, a];
+                for pixel in canvas.pixels.chunks_mut(4) {
+                    pixel.copy_from_slice(&canvas.background_color);
+                }
+            }
+        }
         if word.contains("Boulangerie(") 
         {
             contains = true;
@@ -151,7 +181,6 @@ fn process_content(canvas: &mut World, content_array: &[&str]) {
                 }
                 
             }
-            println!("{}", repeate);
             if word.contains("Croissant") || word.contains("croissant") || word.contains("Baguette") || word.contains("baguette")
             {
                 for _i in 0..repeate.parse::<i32>().unwrap() 
