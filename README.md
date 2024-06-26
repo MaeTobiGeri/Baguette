@@ -1,6 +1,6 @@
 # Baguette Compiler
 
-Baguette was made as a fun side project. It's a rust-based compiler that turns custom "baguette" and "croissant" language files into pixel art images.
+Baguette was made as a fun side project. It's a rust-based compiler that turns custom "baguette" and "croissant" language files into pixel art images. Only tested on Linux should also work on Windows though.
 
 ## Features
 
