@@ -29,7 +29,13 @@ The Baguette language supports the following commands:
 
 ## Building
 
-To build the project, run:
+First clone the repo using: 
+git clone https://github.com/MaeTobiGeri/Baguette.git
+
+Then cd into the Baguette folder using:
+cd Baguette
+
+and build the project by running:
 cargo build --release
 
 ## Usage
